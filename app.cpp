@@ -1,127 +1,96 @@
-﻿/******************************************************************************
- *  app.cpp (for LEGO Mindstorms EV3)
- *  Created on: 2022/07/15
- *  Implementation of the Task main_task
- *  Author: Songjae Kim
- *****************************************************************************/
-
 #include "app.h"
-#include "TracerToGoal.h"
+#include "Tracer.h"
+#include "DataLogger.h"
+#include "Clock.h"
+#include "Locator.h"
 
-// デストラクタ問題の回避
-// https://github.com/ETrobocon/etroboEV3/wiki/problem_and_coping
-void *__dso_handle=0;
+using namespace ev3api;
 
-// using宣言
-using ev3api::ColorSensor;
-using ev3api::TouchSensor;
-using ev3api::Motor;
-using ev3api::Clock;
+Tracer tracer;
+Clock clock;
+DataLogger datalogger;
+Locator locator;
 
-// Device objects
-// オブジェクトを静的に確保する
-ColorSensor gColorSensor(PORT_2);
-TouchSensor gTouchSensor(PORT_1);
-Motor       gLeftWheel(PORT_C);
-Motor       gRightWheel(PORT_B);
-Clock       gClock;
 
-// オブジェクトの定義
-static Walker               *gWalker;
-static LineControllerPID    *gLineControllerPID;
-static Starter              *gStarter;
-static SimpleCounter        *gScenarioCounter;
-static SimpleCounter        *gWalkerCounter;
-static LineTracer           *gLineTracer;
-static Scenario             *gScenario;
-static ScenarioTracer       *gScenarioTracer;
-static TracerToGoal         *gTracerToGoal;
 
-// scene object
-static Scene gScenes[] = {
-    { GO_STRAIGHT,  100, 0 },  // 直進 モータ回転位置 TracerToGoalのSCENARIO_TRACE_COUNTを適宜変更
-};
-
-/*
- * EV3システム生成
- */
-static void user_system_create() {
-    // [TODO] タッチセンサの初期化に2msのdelayがあるため、ここで待つ
-    tslp_tsk(2U * 1000U);
-
-    // オブジェクトの作成
-    gWalker             = new Walker(gLeftWheel,
-                                     gRightWheel);
-    gStarter            = new Starter(gTouchSensor);
-    gLineControllerPID  = new LineControllerPID(gColorSensor, gClock);
-    gScenarioCounter    = new SimpleCounter(gLeftWheel,
-                                            gRightWheel);
-    gWalkerCounter      = new SimpleCounter(gLeftWheel,
-                                            gRightWheel);
-    gLineTracer         = new LineTracer(gLineControllerPID, gWalker);
-    gScenario           = new Scenario(0);
-    gScenarioTracer     = new ScenarioTracer(gWalker,
-                                            gScenario,
-                                            gScenarioCounter);
-    gTracerToGoal       = new TracerToGoal(gLineTracer,
-                                            gScenarioTracer,
-                                            gStarter,
-                                            gWalkerCounter);
-
-    // シナリオを構築する
-    for (uint32_t i = 0; i < (sizeof(gScenes)/sizeof(gScenes[0])); i++) {
-        gScenario->add(&gScenes[i]);
-    }
-    // 初期化完了通知
-    ev3_led_set_color(LED_ORANGE);
+void tracer_task(intptr_t exinf) { // <1>
+  tracer.run(); // <2>
+  ext_tsk();
 }
 
-/**
- * EV3システム破棄
- */
-static void user_system_destroy() {
-    gLeftWheel.reset();
-    gRightWheel.reset();
+void datalogger_task(intptr_t exinf) {
+#ifdef IS_LOGGER_ENABLED
+#ifdef IS_RUNNER_ENABLED
+  datalogger.UpdateEachValues();
+  datalogger.PrettyPrint();
+#else //走行機能無効(手動センサー値取得用)のとき、左ボタンによりログ出力の有/無を切り替える
+  if (ev3_button_is_pressed(RIGHT_BUTTON)) {
+    datalogger.UpdateEachValues();
+    datalogger.PrettyPrint();
+  }
+#endif
+#endif
 
-    delete gTracerToGoal;
-    delete gScenarioTracer;
-    delete gScenario;
-    delete gLineTracer;
-    delete gWalkerCounter;
-    delete gScenarioCounter;
-    delete gLineControllerPID;
-    delete gStarter;
-    delete gWalker;
+  ext_tsk();
 }
 
-/**
- * メインタスク
- */
-void main_task(intptr_t unused) {
-    user_system_create();  // センサやモータの初期化処理
+void locator_task(intptr_t exinf) { // <1>
+  locator.UpdateLocation();
 
-    // 周期ハンドラ開始
-    sta_cyc(CYC_TRACER);
-
-    slp_tsk();  // バックボタンが押されるまで待つ
-
-    // 周期ハンドラ停止
-    stp_cyc(CYC_TRACER);
-
-    user_system_destroy();  // 終了処理
-
-    ext_tsk();
+  Location* location = new Location();
+  locator.GetLocation(location);
+  ext_tsk();
 }
 
-/**
- * ライントレースタスク
- */
-void tracer_task(intptr_t exinf) {
-    if (ev3_button_is_pressed(BACK_BUTTON)) {
-        wup_tsk(MAIN_TASK);  // バックボタン押下
-    } else {
-        gTracerToGoal->run();  // 走行
-    }
+void main_task(intptr_t unused) { // <1>
+  const uint32_t duration = 100*1000; // <2>
 
-    ext_tsk();
+#ifdef IS_RUNNER_ENABLED
+
+  //動作終了のための左ボタン押下待ちループ
+  while (!ev3_button_is_pressed(LEFT_BUTTON)) { // <1>
+      clock.sleep(duration);   // <2>
+  }
+
+  //キャリブレーション開始(自動で一定距離走行し、輝度センサ値を補正する)
+  tracer.caribration();
+
+  //通常走行開始のための右ボタン押下待ちループ
+  //走行開始前に、走行体位置を手動でリセットする必要がある。
+  while (!ev3_button_is_pressed(RIGHT_BUTTON)) { // <1>
+      clock.sleep(duration);   // <2>
+  }
+
+  tracer.init();
+  datalogger.Init();
+  locator.Init();
+  sta_cyc(TRACER_CYC);
+  sta_cyc(DATALOGGER_CYC);
+  sta_cyc(LOCATOR_CYC);
+
+  //動作終了のための左ボタン押下待ちループ
+  while (!ev3_button_is_pressed(LEFT_BUTTON)) {
+      clock.sleep(duration);
+  }
+
+  stp_cyc(TRACER_CYC);
+  sta_cyc(DATALOGGER_CYC);
+  stp_cyc(LOCATOR_CYC);
+
+  tracer.terminate();
+  datalogger.Terminate();
+  locator.Terminate();
+  syslog(LOG_NOTICE,"maintask_end");
+  ext_tsk();
+
+// 走行機能無効用の暫定実装。ロガーの動作切り替えに左右ボタン必要なため、ここではボタン利用できない。
+#else
+  tracer.init();
+  datalogger.Init();
+
+  sta_cyc(DATALOGGER_CYC);
+  
+  //動作終了のトリガを走行体に与えられないため、終了処理を省略する。
+#endif
+
 }
