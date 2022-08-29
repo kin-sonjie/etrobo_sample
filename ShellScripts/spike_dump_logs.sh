@@ -10,4 +10,6 @@ log_file_name=`date "+%Y%m%d_%H%M%S_log.csv"`
 # echo $log_file_name
 
 cd ../
-scp.exe -r $folder_name genetec@etrobo-ydc3.local:work/RasPike/sdk/workspace/
+sim
+make img=Genkai2022
+make start | tee -i $folder_path/ShellScripts/logs/$log_file_name

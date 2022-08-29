@@ -10,5 +10,6 @@ log_file_name=`date "+%Y%m%d_%H%M%S_log.csv"`
 # echo $log_file_name
 
 cd ../../../../
-sim
-make skiphrp3 app=$folder_name sim start
+make app=Genkai2022 2>&1 | grep "error" --color=always
+
+

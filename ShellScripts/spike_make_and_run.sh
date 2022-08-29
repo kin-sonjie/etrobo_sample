@@ -9,7 +9,6 @@ log_file_name=`date "+%Y%m%d_%H%M%S_log.csv"`
 # echo $folder_name
 # echo $log_file_name
 
-cd ../../../../
-make app=$folder_name 2>&1 | grep "error" --color=always
-
-
+cd ../
+make img=Genkai2022
+make start

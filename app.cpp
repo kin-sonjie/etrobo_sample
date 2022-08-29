@@ -1,20 +1,22 @@
 #include "app.h"
-#include "Tracer.h"
+#include "DriveManager.h"
+#include "DriveInfoTable.h"
 #include "DataLogger.h"
 #include "Clock.h"
 #include "Locator.h"
 
 using namespace ev3api;
 
-Tracer tracer;
+DriveManager drive_manager;
+DriveInfoTable drive_info_table;
 Clock clock;
 DataLogger datalogger;
 Locator locator;
 
 
 
-void tracer_task(intptr_t exinf) { // <1>
-  tracer.run(); // <2>
+void drive_manager_task(intptr_t exinf) { // <1>
+  drive_manager.RunByDriver(); // <2>
   ext_tsk();
 }
 
@@ -53,7 +55,7 @@ void main_task(intptr_t unused) { // <1>
   }
 
   //キャリブレーション開始(自動で一定距離走行し、輝度センサ値を補正する)
-  tracer.caribration();
+  //tracer.caribration();
 
   //通常走行開始のための右ボタン押下待ちループ
   //走行開始前に、走行体位置を手動でリセットする必要がある。
@@ -61,10 +63,11 @@ void main_task(intptr_t unused) { // <1>
       clock.sleep(duration);   // <2>
   }
 
-  tracer.init();
+  drive_manager.Init();
+  drive_manager.setDriveInfo(drive_info_table.getDriveInfo(0));
   datalogger.Init();
   locator.Init();
-  sta_cyc(TRACER_CYC);
+  sta_cyc(DRIVE_MANAGER_CYC);
   sta_cyc(DATALOGGER_CYC);
   sta_cyc(LOCATOR_CYC);
 
@@ -73,11 +76,11 @@ void main_task(intptr_t unused) { // <1>
       clock.sleep(duration);
   }
 
-  stp_cyc(TRACER_CYC);
+  stp_cyc(DRIVE_MANAGER_CYC);
   sta_cyc(DATALOGGER_CYC);
   stp_cyc(LOCATOR_CYC);
 
-  tracer.terminate();
+  drive_manager.Terminate();
   datalogger.Terminate();
   locator.Terminate();
   syslog(LOG_NOTICE,"maintask_end");
@@ -85,7 +88,7 @@ void main_task(intptr_t unused) { // <1>
 
 // 走行機能無効用の暫定実装。ロガーの動作切り替えに左右ボタン必要なため、ここではボタン利用できない。
 #else
-  tracer.init();
+  drive_manager.Init();
   datalogger.Init();
 
   sta_cyc(DATALOGGER_CYC);

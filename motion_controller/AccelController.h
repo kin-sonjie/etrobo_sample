@@ -3,8 +3,8 @@
 #include "ev3api.h"
 
 struct AccelInfo {
-    int8_t start_val;
-    int8_t target_val;
+    int8_t start_pwm;
+    int8_t target_pwm;
     float time; //[sec]
 };
 
@@ -12,10 +12,12 @@ class AccelController {
 public:
     AccelController();
     void Init();
-    void setParameters(AccelInfo *accel_info);
-    float getAccel();
+    void setControlRate(int8_t start_pwm, int8_t target_pwm, float time);
+    float getControlVal();
 private:
+    float RoundControlRate(float control_rate);
     static const float kDeltaTime_;
+    static const float kRateAbsMax_;
     float control_val_;
     float control_rate_;
 };

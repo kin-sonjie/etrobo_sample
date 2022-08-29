@@ -10,5 +10,4 @@ log_file_name=`date "+%Y%m%d_%H%M%S_log.csv"`
 # echo $log_file_name
 
 cd ../
-make img=$folder_name
-make start
+make img=Genkai2022 2>&1 | grep "error" --color=always

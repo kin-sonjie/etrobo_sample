@@ -11,5 +11,5 @@ log_file_name=`date "+%Y%m%d_%H%M%S_log.csv"`
 
 cd ../../../../
 sim
-make app=$folder_name
+make app=Genkai2022
 asp stdout launch | tee -i $folder_path/ShellScripts/logs/$log_file_name

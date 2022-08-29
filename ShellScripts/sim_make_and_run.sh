@@ -9,7 +9,6 @@ log_file_name=`date "+%Y%m%d_%H%M%S_log.csv"`
 # echo $folder_name
 # echo $log_file_name
 
-cd ../
+cd ../../../../
 sim
-make img=$folder_name
-make start | tee -i $folder_path/ShellScripts/logs/$log_file_name
+make skiphrp3 app=Genkai2022 sim start
